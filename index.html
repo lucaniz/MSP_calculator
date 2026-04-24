@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MSP × PDP Decision Tool</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #fafaf7;
+    color: #1a1a1a;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    padding: 48px 24px;
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+  .container { max-width: 720px; margin: 0 auto; }
+  h1 {
+    font-size: 22px;
+    margin: 0 0 6px;
+    letter-spacing: -0.01em;
+    font-weight: 600;
+    color: #111;
+  }
+  .sub {
+    color: #888;
+    font-size: 12px;
+    margin-bottom: 32px;
+    letter-spacing: 0.04em;
+  }
+
+  .panel {
+    background: #ffffff;
+    border: 1px solid #e5e3dc;
+    padding: 24px;
+    margin-bottom: 14px;
+    border-radius: 4px;
+  }
+
+  .row {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .row:last-child { margin-bottom: 0; }
+  .row label {
+    font-size: 13px;
+    min-width: 140px;
+    color: #333;
+    font-weight: 500;
+  }
+  .row label .sub-label {
+    color: #999;
+    font-size: 11px;
+    display: block;
+    margin-top: 2px;
+    font-weight: 400;
+  }
+  input[type=range] {
+    flex: 1;
+    accent-color: #2a6f4d;
+    min-width: 120px;
+  }
+  input[type=number] {
+    background: #fafaf7;
+    color: #1a1a1a;
+    border: 1px solid #d5d3cc;
+    padding: 6px 10px;
+    width: 90px;
+    font-family: inherit;
+    font-size: 13px;
+    border-radius: 3px;
+  }
+  input[type=number]:focus { outline: none; border-color: #2a6f4d; }
+  .val {
+    color: #1a1a1a;
+    min-width: 70px;
+    font-size: 14px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+  }
+  .val.green { color: #2a6f4d; }
+  .val.red { color: #b8392e; }
+
+  .decision {
+    text-align: center;
+    padding: 28px 20px;
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    border: 1px solid;
+    margin: 24px 0 12px;
+    border-radius: 4px;
+  }
+  .pass { background: #eef7ef; border-color: #b4d9b9; color: #2a6f4d; }
+  .pass-weak { background: #fdf7e3; border-color: #e6d58b; color: #8a6d1a; }
+  .repair { background: #eaf4fb; border-color: #a9cde8; color: #1f5580; }
+  .migrate { background: #fbecea; border-color: #e6b3ac; color: #b8392e; }
+  .detail {
+    font-size: 13px;
+    color: #666;
+    text-align: center;
+    line-height: 1.6;
+    padding: 0 12px;
+  }
+
+  .viz {
+    position: relative;
+    height: 56px;
+    background: #fff;
+    border: 1px solid #e0ddd4;
+    margin: 24px 0 4px;
+    border-radius: 3px;
+  }
+  .zone-pass { position: absolute; top: 0; bottom: 0; background: rgba(42, 111, 77, 0.12); }
+  .zone-repair { position: absolute; top: 0; bottom: 0; background: rgba(31, 85, 128, 0.12); }
+  .zone-migrate { position: absolute; top: 0; bottom: 0; background: rgba(184, 57, 46, 0.12); }
+  .ci-range {
+    position: absolute;
+    top: 0; bottom: 0;
+    border-left: 2px solid #8a6d1a;
+    border-right: 2px solid #8a6d1a;
+    background: rgba(230, 213, 139, 0.35);
+  }
+  .ci-point {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 11px; height: 11px;
+    background: #1a1a1a;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px #1a1a1a;
+  }
+  .marker-sla { position: absolute; top: -4px; bottom: -4px; width: 2px; background: #2a6f4d; }
+  .marker-rad { position: absolute; top: -4px; bottom: -4px; width: 2px; background: #b8392e; }
+  .scale {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #999;
+    margin-top: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+  .legend {
+    display: flex;
+    gap: 18px;
+    font-size: 12px;
+    color: #666;
+    margin-top: 14px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 14px; height: 2px; }
+
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px 24px;
+    margin-top: 8px;
+    font-size: 13px;
+  }
+  .summary-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px dashed #e0ddd4;
+  }
+  .summary-item span:first-child { color: #888; }
+  .summary-item span:last-child {
+    color: #222;
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+  }
+  @media (max-width: 600px) {
+    .summary { grid-template-columns: 1fr; }
+    .row label { min-width: 100px; }
+    body { padding: 24px 16px; }
+  }
+
+  .section-title {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: #888;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee8dd;
+    font-weight: 600;
+  }
+  .link-footer {
+    text-align: center;
+    font-size: 12px;
+    color: #888;
+    padding: 20px 0 0;
+  }
+  .link-footer a {
+    color: #666;
+    text-decoration: none;
+    border-bottom: 1px dotted #aaa;
+  }
+  .link-footer a:hover { color: #2a6f4d; border-color: #2a6f4d; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>MSP × PDP Decision Tool</h1>
+  <div class="sub">Audit-driven decision: repair affected pieces vs repair entire dataset</div>
+
+  <div class="panel">
+    <div class="section-title">Observation</div>
+    <div class="row">
+      <label>Challenges sent<span class="sub-label">N</span></label>
+      <input type="range" id="N" min="10" max="500" value="100">
+      <input type="number" id="Nnum" min="1" max="10000" value="100">
+      <span class="val" id="Nval">100</span>
+    </div>
+    <div class="row">
+      <label>Failures observed<span class="sub-label">k</span></label>
+      <input type="range" id="k" min="0" max="100" value="0">
+      <input type="number" id="knum" min="0" max="10000" value="0">
+      <span class="val" id="kval">0</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="section-title">Thresholds</div>
+    <div class="row">
+      <label>SLA limit<span class="sub-label">contract</span></label>
+      <input type="range" id="sla" min="0.001" max="0.2" step="0.001" value="0.01">
+      <input type="number" id="slanum" min="0.001" max="0.5" step="0.001" value="0.01">
+      <span class="val green" id="slaval">1.0%</span>
+    </div>
+    <div class="row">
+      <label>Radical limit<span class="sub-label">disaster</span></label>
+      <input type="range" id="rad" min="0.01" max="0.6" step="0.01" value="0.10">
+      <input type="number" id="radnum" min="0.01" max="1" step="0.01" value="0.10">
+      <span class="val red" id="radval">10%</span>
+    </div>
+  </div>
+
+  <div class="decision" id="decision">→ PASS</div>
+  <div class="detail" id="detail"></div>
+
+  <div class="viz" id="viz">
+    <div class="zone-pass" id="zpass"></div>
+    <div class="zone-repair" id="zrepair"></div>
+    <div class="zone-migrate" id="zmigrate"></div>
+    <div class="ci-range" id="cirange"></div>
+    <div class="ci-point" id="cipoint"></div>
+    <div class="marker-sla" id="msla"></div>
+    <div class="marker-rad" id="mrad"></div>
+  </div>
+  <div class="scale">
+    <span>0%</span><span id="lbl25"></span><span id="lbl50"></span><span id="lbl75"></span><span id="lblmax"></span>
+  </div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#2a6f4d"></div> Pass</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#1f5580"></div> Repair affected pieces</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#b8392e"></div> Repair entire dataset</div>
+  </div>
+
+  <div class="panel" style="margin-top: 24px;">
+    <div class="section-title">Summary</div>
+    <div class="summary">
+      <div class="summary-item"><span>Estimate f̂</span><span id="fhat">—</span></div>
+      <div class="summary-item"><span>Confidence interval</span><span id="ciText">—</span></div>
+      <div class="summary-item"><span>Zone from estimate</span><span id="zoneText">—</span></div>
+      <div class="summary-item"><span>Uncertainty flag</span><span id="uncText">—</span></div>
+    </div>
+  </div>
+
+  <div class="link-footer">
+    Full technical documentation → <a href="#" id="docLink">see Notion doc</a>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+function syncPair(rangeId, numId) {
+  $(rangeId).addEventListener('input', () => { $(numId).value = $(rangeId).value; update(); });
+  $(numId).addEventListener('input', () => { $(rangeId).value = $(numId).value; update(); });
+}
+syncPair('N','Nnum');
+syncPair('k','knum');
+syncPair('sla','slanum');
+syncPair('rad','radnum');
+
+function pct(x, d=2) { return (x*100).toFixed(d) + '%'; }
+
+function update() {
+  const N = +$('N').value;
+  let k = Math.min(+$('k').value, N);
+  if (+$('k').value > N) { $('k').value = N; $('knum').value = N; k = N; }
+  $('k').max = N;
+  let slaTarget = +$('sla').value;
+  let radical = +$('rad').value;
+
+  if (radical < slaTarget) {
+    radical = slaTarget;
+    $('rad').value = radical;
+    $('radnum').value = radical.toFixed(3);
+  }
+
+  $('Nval').textContent = N;
+  $('kval').textContent = k;
+  $('slaval').textContent = pct(slaTarget, 1);
+  $('radval').textContent = pct(radical, 1);
+
+  const fHat = k / N;
+  const z = 2.576;
+  const alpha = 0.01;
+
+  const z2 = z*z;
+  const denom = 1 + z2/N;
+  const center = (fHat + z2/(2*N)) / denom;
+  const halfWidth = (z * Math.sqrt((fHat*(1-fHat))/N + z2/(4*N*N))) / denom;
+  const fMin = Math.max(0, center - halfWidth);
+  const fMax = Math.min(1, center + halfWidth);
+  const zeroFailBound = k === 0 ? 1 - Math.pow(alpha, 1/N) : null;
+
+  let decision, colorClass, detailText, zoneText, uncText;
+  const ciStraddlesSLA = fMin <= slaTarget && fMax > slaTarget;
+  const ciStraddlesRadical = fMin <= radical && fMax > radical;
+
+  if (k === 0) {
+    if (zeroFailBound < slaTarget) {
+      decision = 'PASS'; colorClass = 'pass';
+      detailText = `No failures. Corruption is below ${pct(zeroFailBound,2)} with 99% confidence, well under SLA.`;
+      zoneText = 'Pass'; uncText = 'none';
+    } else {
+      decision = 'PASS (weak)'; colorClass = 'pass-weak';
+      detailText = `No failures, but N is too small to exclude f > SLA. Consider increasing N to at least ${Math.ceil(-Math.log(alpha)/slaTarget)}.`;
+      zoneText = 'Pass'; uncText = 'low N';
+    }
+  } else if (fHat <= slaTarget) {
+    decision = 'PASS'; colorClass = 'pass';
+    detailText = `Corruption estimate ${pct(fHat)} is within SLA (${pct(slaTarget,1)}). SP is healthy.`;
+    zoneText = 'Pass'; uncText = ciStraddlesSLA ? 'CI crosses SLA' : 'none';
+    if (ciStraddlesSLA) { colorClass = 'pass-weak'; decision = 'PASS (monitor)'; }
+  } else if (fHat <= radical) {
+    decision = 'REPAIR AFFECTED PIECES'; colorClass = 'repair';
+    detailText = `Corruption ${pct(fHat)} exceeds SLA but is below radical. Repair the failed pieces and re-audit in 24h.`;
+    zoneText = 'Repair';
+    uncText = ciStraddlesRadical ? 'CI crosses radical' : (ciStraddlesSLA ? 'CI crosses SLA' : 'none');
+  } else {
+    decision = 'REPAIR ENTIRE DATASET'; colorClass = 'migrate';
+    detailText = `Corruption ${pct(fHat)} exceeds the radical threshold. Repair the entire dataset (migrate to a fresh SP or re-upload in full).`;
+    zoneText = 'Repair all'; uncText = ciStraddlesRadical ? 'CI crosses radical' : 'none';
+  }
+
+  const dEl = $('decision');
+  dEl.textContent = '→ ' + decision;
+  dEl.className = 'decision ' + colorClass;
+  $('detail').textContent = detailText;
+
+  const scaleMax = Math.min(1, Math.max(0.25, radical * 1.8, fMax * 1.2));
+  const toPct = v => Math.min(100, (v / scaleMax) * 100);
+
+  $('zpass').style.left = '0%';
+  $('zpass').style.width = toPct(slaTarget) + '%';
+  $('zrepair').style.left = toPct(slaTarget) + '%';
+  $('zrepair').style.width = (toPct(radical) - toPct(slaTarget)) + '%';
+  $('zmigrate').style.left = toPct(radical) + '%';
+  $('zmigrate').style.width = (100 - toPct(radical)) + '%';
+
+  $('cirange').style.left = toPct(fMin) + '%';
+  $('cirange').style.width = Math.max(0.5, toPct(fMax) - toPct(fMin)) + '%';
+  $('cipoint').style.left = toPct(fHat) + '%';
+  $('msla').style.left = toPct(slaTarget) + '%';
+  $('mrad').style.left = toPct(radical) + '%';
+
+  $('lbl25').textContent = pct(scaleMax * 0.25, 1);
+  $('lbl50').textContent = pct(scaleMax * 0.5, 1);
+  $('lbl75').textContent = pct(scaleMax * 0.75, 1);
+  $('lblmax').textContent = pct(scaleMax, 0);
+
+  $('fhat').textContent = pct(fHat);
+  $('ciText').textContent = `[${pct(fMin,2)}, ${pct(fMax,2)}]`;
+  $('zoneText').textContent = zoneText;
+  $('uncText').textContent = uncText;
+}
+
+update();
+</script>
+</body>
+</html>
