@@ -86,6 +86,32 @@
   .val.green { color: #2a6f4d; }
   .val.red { color: #b8392e; }
 
+  /* Confidence toggle */
+  .toggle-group {
+    display: inline-flex;
+    border: 1px solid #d5d3cc;
+    border-radius: 4px;
+    overflow: hidden;
+    background: #fafaf7;
+  }
+  .toggle-btn {
+    background: transparent;
+    border: none;
+    padding: 8px 18px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    color: #666;
+    transition: background 0.15s, color 0.15s;
+  }
+  .toggle-btn:not(:last-child) { border-right: 1px solid #d5d3cc; }
+  .toggle-btn:hover { background: #f0eee6; color: #333; }
+  .toggle-btn.active {
+    background: #2a6f4d;
+    color: #fff;
+  }
+
   .decision {
     text-align: center;
     padding: 28px 20px;
@@ -238,6 +264,13 @@
       <input type="number" id="knum" min="0" max="10000" value="0">
       <span class="val" id="kval">0</span>
     </div>
+    <div class="row">
+      <label>Confidence level<span class="sub-label">statistical certainty</span></label>
+      <div class="toggle-group">
+        <button class="toggle-btn" data-conf="0.95">95%</button>
+        <button class="toggle-btn active" data-conf="0.99">99%</button>
+      </div>
+    </div>
   </div>
 
   <div class="panel">
@@ -289,12 +322,14 @@
   </div>
 
   <div class="link-footer">
-    Full technical documentation → <a href="https://www.notion.so/filecoindev/MSP-Audit-Protocol-Design-WIP-34cdc41950c1803e8e1bc0a9c301dbe1" id="docLink" target="_blank" rel="noopener noreferrer">see Notion doc</a>
+    Full technical documentation → <a href="https://www.notion.so/filecoindev/FilOz-Internal-Notebook-a8a0f5535af2469b888b3e7a0ff21005?p=34cdc41950c1803e8e1bc0a9c301dbe1&pm=s" target="_blank" rel="noopener noreferrer">see Notion doc</a>
   </div>
 </div>
 
 <script>
 const $ = id => document.getElementById(id);
+
+let confidence = 0.99;
 
 function syncPair(rangeId, numId) {
   $(rangeId).addEventListener('input', () => { $(numId).value = $(rangeId).value; update(); });
@@ -304,6 +339,15 @@ syncPair('N','Nnum');
 syncPair('k','knum');
 syncPair('sla','slanum');
 syncPair('rad','radnum');
+
+document.querySelectorAll('.toggle-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    confidence = parseFloat(btn.dataset.conf);
+    update();
+  });
+});
 
 function pct(x, d=2) { return (x*100).toFixed(d) + '%'; }
 
@@ -327,8 +371,8 @@ function update() {
   $('radval').textContent = pct(radical, 1);
 
   const fHat = k / N;
-  const z = 2.576;
-  const alpha = 0.01;
+  const z = confidence === 0.99 ? 2.576 : 1.96;
+  const alpha = 1 - confidence;
 
   const z2 = z*z;
   const denom = 1 + z2/N;
@@ -342,11 +386,12 @@ function update() {
   let reauditText, reauditClass;
   const ciStraddlesSLA = fMin <= slaTarget && fMax > slaTarget;
   const ciStraddlesRadical = fMin <= radical && fMax > radical;
+  const confStr = (confidence*100).toFixed(0) + '%';
 
   if (k === 0) {
     if (zeroFailBound < slaTarget) {
       decision = 'PASS'; colorClass = 'pass';
-      detailText = `No failures. Corruption is below ${pct(zeroFailBound,2)} with 99% confidence, well under SLA.`;
+      detailText = `No failures. Corruption is below ${pct(zeroFailBound,2)} at ${confStr} confidence — under SLA.`;
       zoneText = 'Pass'; uncText = 'none';
       reauditText = 'Re-audit at next scheduled iteration'; reauditClass = 'reaudit-next';
     } else {
@@ -417,7 +462,7 @@ function update() {
   $('lblmax').textContent = pct(scaleMax, 0);
 
   $('fhat').textContent = pct(fHat);
-  $('ciText').textContent = `[${pct(fMin,2)}, ${pct(fMax,2)}]`;
+  $('ciText').textContent = `[${pct(fMin,2)}, ${pct(fMax,2)}] @ ${confStr}`;
   $('zoneText').textContent = zoneText;
   $('uncText').textContent = uncText;
 }
