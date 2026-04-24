@@ -107,13 +107,25 @@
     line-height: 1.6;
     padding: 0 12px;
   }
+  .reaudit-wrapper { text-align: center; margin-top: 10px; min-height: 20px; }
+  .reaudit {
+    font-size: 12px;
+    padding: 6px 14px;
+    display: inline-block;
+    border-radius: 20px;
+    font-weight: 500;
+    border: 1px solid transparent;
+  }
+  .reaudit-next { background: #f0eee6; color: #666; border-color: #e0ddd0; }
+  .reaudit-now { background: #fdf7e3; color: #8a6d1a; border-color: #e6d58b; }
+  .reaudit-none { display: none; }
 
   .viz {
     position: relative;
     height: 56px;
     background: #fff;
     border: 1px solid #e0ddd4;
-    margin: 24px 0 4px;
+    margin: 20px 0 4px;
     border-radius: 3px;
   }
   .zone-pass { position: absolute; top: 0; bottom: 0; background: rgba(42, 111, 77, 0.12); }
@@ -246,6 +258,7 @@
 
   <div class="decision" id="decision">→ PASS</div>
   <div class="detail" id="detail"></div>
+  <div class="reaudit-wrapper"><div class="reaudit reaudit-none" id="reaudit"></div></div>
 
   <div class="viz" id="viz">
     <div class="zone-pass" id="zpass"></div>
@@ -326,6 +339,7 @@ function update() {
   const zeroFailBound = k === 0 ? 1 - Math.pow(alpha, 1/N) : null;
 
   let decision, colorClass, detailText, zoneText, uncText;
+  let reauditText, reauditClass;
   const ciStraddlesSLA = fMin <= slaTarget && fMax > slaTarget;
   const ciStraddlesRadical = fMin <= radical && fMax > radical;
 
@@ -334,31 +348,52 @@ function update() {
       decision = 'PASS'; colorClass = 'pass';
       detailText = `No failures. Corruption is below ${pct(zeroFailBound,2)} with 99% confidence, well under SLA.`;
       zoneText = 'Pass'; uncText = 'none';
+      reauditText = 'Re-audit at next scheduled iteration'; reauditClass = 'reaudit-next';
     } else {
       decision = 'PASS (weak)'; colorClass = 'pass-weak';
       detailText = `No failures, but N is too small to exclude f > SLA. Consider increasing N to at least ${Math.ceil(-Math.log(alpha)/slaTarget)}.`;
       zoneText = 'Pass'; uncText = 'low N';
+      reauditText = 'Re-audit immediately with larger N'; reauditClass = 'reaudit-now';
     }
   } else if (fHat <= slaTarget) {
-    decision = 'PASS'; colorClass = 'pass';
-    detailText = `Corruption estimate ${pct(fHat)} is within SLA (${pct(slaTarget,1)}). SP is healthy.`;
-    zoneText = 'Pass'; uncText = ciStraddlesSLA ? 'CI crosses SLA' : 'none';
-    if (ciStraddlesSLA) { colorClass = 'pass-weak'; decision = 'PASS (monitor)'; }
+    if (ciStraddlesSLA) {
+      decision = 'PASS (monitor)'; colorClass = 'pass-weak';
+      detailText = `Estimate within SLA but CI crosses the threshold. Likely OK, keep monitoring.`;
+      zoneText = 'Pass'; uncText = 'CI crosses SLA';
+      reauditText = 'Re-audit immediately to reduce uncertainty'; reauditClass = 'reaudit-now';
+    } else {
+      decision = 'PASS'; colorClass = 'pass';
+      detailText = `Corruption estimate ${pct(fHat)} is within SLA (${pct(slaTarget,1)}). SP is healthy.`;
+      zoneText = 'Pass'; uncText = 'none';
+      reauditText = 'Re-audit at next scheduled iteration'; reauditClass = 'reaudit-next';
+    }
   } else if (fHat <= radical) {
-    decision = 'REPAIR AFFECTED PIECES'; colorClass = 'repair';
-    detailText = `Corruption ${pct(fHat)} exceeds SLA but is below radical. Repair the failed pieces and re-audit in 24h.`;
-    zoneText = 'Repair';
-    uncText = ciStraddlesRadical ? 'CI crosses radical' : (ciStraddlesSLA ? 'CI crosses SLA' : 'none');
+    if (ciStraddlesRadical) {
+      decision = 'UNCERTAIN'; colorClass = 'pass-weak';
+      detailText = `Between SLA and radical, but CI crosses the radical threshold. Cannot decide between partial and full repair.`;
+      zoneText = 'Repair'; uncText = 'CI crosses radical';
+      reauditText = 'Re-audit immediately to reduce uncertainty'; reauditClass = 'reaudit-now';
+    } else {
+      decision = 'REPAIR AFFECTED PIECES'; colorClass = 'repair';
+      detailText = `Corruption ${pct(fHat)} exceeds SLA but stays below radical. Repair the failed pieces.`;
+      zoneText = 'Repair'; uncText = ciStraddlesSLA ? 'CI crosses SLA' : 'none';
+      reauditText = 'Re-audit at next scheduled iteration'; reauditClass = 'reaudit-next';
+    }
   } else {
     decision = 'REPAIR ENTIRE DATASET'; colorClass = 'migrate';
-    detailText = `Corruption ${pct(fHat)} exceeds the radical threshold. Repair the entire dataset (migrate to a fresh SP or re-upload in full).`;
+    detailText = `Corruption ${pct(fHat)} exceeds the radical threshold. Repair the entire dataset by migrating to a fresh SP.`;
     zoneText = 'Repair all'; uncText = ciStraddlesRadical ? 'CI crosses radical' : 'none';
+    reauditText = ''; reauditClass = 'reaudit-none';
   }
 
   const dEl = $('decision');
   dEl.textContent = '→ ' + decision;
   dEl.className = 'decision ' + colorClass;
   $('detail').textContent = detailText;
+
+  const rEl = $('reaudit');
+  rEl.className = 'reaudit ' + reauditClass;
+  rEl.textContent = reauditText;
 
   const scaleMax = Math.min(1, Math.max(0.25, radical * 1.8, fMax * 1.2));
   const toPct = v => Math.min(100, (v / scaleMax) * 100);
